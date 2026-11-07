@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snötillverkning Sveg – prognoser</title>
+<style>
+:root{--bg:#f2f6fa;--card:#fff;--text:#14212b;--mut:#5b6b78;--line:#d9e1e8;--cold:#1d6fd1;--coldbg:#d8e9fb;--ok:#13804f;--no:#b83b2d;--warm:#f6f8fa}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1419;--card:#17202a;--text:#e8eef3;--mut:#93a3b1;--line:#2a3743;--cold:#5aa8ff;--coldbg:#173452;--ok:#3ccf8e;--no:#ff7b6b;--warm:#1b2631}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:0 0 2px}
+.sub{color:var(--mut);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px}
+h2{font-size:15px;margin:0 0 10px}
+.controls{display:flex;gap:16px;flex-wrap:wrap;align-items:end;margin-top:14px}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:4px}
+input{width:90px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text);font-size:15px}
+button{padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer;font-size:14px}
+.verdict{font-size:18px;font-weight:600}
+.verdict.good{color:var(--ok)} .verdict.bad{color:var(--no)}
+canvas{width:100%;height:340px;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:13px}
+.legend i{display:inline-block;width:12px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:7px 8px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mut);font-weight:600;font-size:12px}
+td.c{text-align:center}
+td.cold{background:var(--coldbg);color:var(--cold);font-weight:600}
+td.warm{background:var(--warm)}
+.err{color:var(--no);font-size:13px;margin-top:8px}
+.foot{color:var(--mut);font-size:12px;margin-top:18px}
+a{color:var(--cold)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Snötillverkning – Skidstadion Sveg</h1>
+  <div class="sub" id="where">Hämtar prognoser…</div>
+
+  <div class="controls">
+    <label>Gräns (°C)<input id="thr" type="number" value="-4" step="1"></label>
+    <label>Sammanhängande timmar<input id="hrs" type="number" value="6" min="1" max="72"></label>
+    <button id="reload">Uppdatera nu</button>
+    <a href="https://www.temperatur.nu/" target="_blank" rel="noopener">Mätvärde: termostat “Skidstadion Sveg” på temperatur.nu ↗</a>
+  </div>
+
+  <div class="card">
+    <div class="verdict" id="verdict">…</div>
+    <div class="sub" id="verdictSub"></div>
+  </div>
+
+  <div class="card">
+    <h2>Temperaturprognos, 7 dygn</h2>
+    <canvas id="chart"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="err" id="errors"></div>
+  </div>
+
+  <div class="card">
+    <h2>Första möjliga startfönster per prognos</h2>
+    <div class="scroll"><table id="tbl"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>Per dygn: lägsta temperatur · timmar under gränsen</h2>
+    <div class="scroll"><table id="days"></table></div>
+  </div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const TZ = 'Europe/Stockholm';
+const FALLBACK = { lat: 62.034, lon: 14.364, name: 'Sveg' };
+const OM_MODELS = [
+  ['ecmwf_ifs025', 'ECMWF'],
+  ['gfs_seamless', 'GFS (NOAA)'],
+  ['icon_seamless', 'ICON (DWD)'],
+  ['meteofrance_seamless', 'Météo-France'],
+  ['ukmo_seamless', 'UK Met Office'],
+  ['dmi_seamless', 'DMI Harmonie']
+];
+const COLORS = ['#e6194b','#3cb44b','#4363d8','#f58231','#911eb4','#008080','#9a6324','#808000'];
+const HOURS = 168;
+
+const $ = id => document.getElementById(id);
+let SOURCES = [], FAILED = [], GRID = [], LOC = FALLBACK, UPDATED = null;
+
+try { const s = JSON.parse(localStorage.getItem('snow-cfg') || '{}'); if (s.t != null) $('thr').value = s.t; if (s.h != null) $('hrs').value = s.h; } catch (e) {}
+
+function fmtT(v) { return v == null ? '–' : (Math.round(v) + '°').replace('-', '−'); }
+function fmtTime(ms) {
+  return new Date(ms).toLocaleString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: TZ });
+}
+function dayKey(ms) { return new Date(ms).toLocaleDateString('sv-SE', { timeZone: TZ }); }
+
+// Lägg alla källor på samma timgrid (linjär interpolation)
+function resample(points) {
+  const pts = points.filter(p => p.v != null && !isNaN(p.v)).sort((a, b) => a.t - b.t);
+  return GRID.map(t => {
+    let lo = null, hi = null;
+    for (const p of pts) { if (p.t <= t) lo = p; if (p.t >= t) { hi = p; break; } }
+    if (lo && hi) {
+      if (lo.t === hi.t) return lo.v;
+      if (hi.t - lo.t > 8 * 3600e3) return null;
+      return lo.v + (hi.v - lo.v) * (t - lo.t) / (hi.t - lo.t);
+    }
+    return null;
+  });
+}
+
+async function getJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+async function locate() {
+  try {
+    const d = await getJSON('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent('Ulvkälla') + '&count=10&language=sv&country_code=SE');
+    const hit = (d.results || []).find(r => r.latitude > 61 && r.latitude < 63.2 && r.longitude > 13 && r.longitude < 16);
+    if (hit) return { lat: hit.latitude, lon: hit.longitude, name: 'Ulvkälla' };
+  } catch (e) {}
+  return FALLBACK;
+}
+
+async function loadAll() {
+  $('where').textContent = 'Hämtar prognoser…';
+  const now = Date.now();
+  const start = Math.ceil(now / 3600e3) * 3600e3;
+  GRID = Array.from({ length: HOURS }, (_, i) => start + i * 3600e3);
+  LOC = await locate();
+  const { lat, lon } = LOC;
+  const jobs = [];
+
+  jobs.push((async () => {
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+      '&hourly=temperature_2m&models=' + OM_MODELS.map(m => m[0]).join(',') +
+      '&timezone=Europe%2FStockholm&forecast_days=8&timeformat=unixtime';
+    const d = await getJSON(url);
+    const times = d.hourly.time.map(s => s * 1000);
+    return OM_MODELS.map(([key, name]) => {
+      const arr = d.hourly['temperature_2m_' + key];
+      if (!arr || arr.every(v => v == null)) return { name, error: 'inga data' };
+      return { name, vals: resample(times.map((t, i) => ({ t, v: arr[i] }))) };
+    });
+  })().catch(e => [{ name: 'Open-Meteo (flera modeller)', error: e.message }]));
+
+  jobs.push((async () => {
+    const d = await getJSON('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + lat.toFixed(4) + '&lon=' + lon.toFixed(4));
+    const pts = d.properties.timeseries.map(x => ({ t: Date.parse(x.time), v: x.data.instant.details.air_temperature }));
+    return [{ name: 'Yr (Met Norway)', vals: resample(pts) }];
+  })().catch(e => [{ name: 'Yr (Met Norway)', error: e.message }]));
+
+  jobs.push((async () => {
+    const d = await getJSON('https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/' + lon.toFixed(5) + '/lat/' + lat.toFixed(5) + '/data.json');
+    const pts = d.timeSeries.map(x => ({ t: Date.parse(x.time), v: x.data.air_temperature }));
+    return [{ name: 'SMHI', vals: resample(pts) }];
+  })().catch(e => [{ name: 'SMHI', error: e.message }]));
+
+  const all = (await Promise.all(jobs)).flat();
+  SOURCES = all.filter(s => s.vals).map((s, i) => ({ ...s, color: COLORS[i % COLORS.length] }));
+  FAILED = all.filter(s => s.error);
+  UPDATED = new Date();
+  render();
+}
+
+// Första sammanhängande fönster med temp <= T i minst H timmar
+function findWindow(vals, T, H) {
+  let runStart = -1;
+  for (let i = 0; i <= vals.length; i++) {
+    const ok = i < vals.length && vals[i] != null && vals[i] <= T;
+    if (ok && runStart < 0) runStart = i;
+    if (!ok && runStart >= 0) {
+      if (i - runStart >= H) return { s: runStart, e: i, open: false };
+      runStart = -1;
+    }
+    if (i === vals.length - 1 && ok && runStart >= 0 && vals.length - runStart >= H) return { s: runStart, e: vals.length, open: true };
+  }
+  return null;
+}
+const minOf = a => { const v = a.filter(x => x != null); return v.length ? Math.min(...v) : null; };
+
+function render() {
+  const T = +$('thr').value, H = Math.max(1, +$('hrs').value || 1);
+  try { localStorage.setItem('snow-cfg', JSON.stringify({ t: T, h: H })); } catch (e) {}
+  $('where').textContent = 'Prognospunkt: ' + LOC.name + ' (' + LOC.lat.toFixed(3) + ', ' + LOC.lon.toFixed(3) + ') · uppdaterad ' +
+    (UPDATED ? UPDATED.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: TZ }) : '–');
+
+  const wins = SOURCES.map(s => ({ s, w: findWindow(s.vals, T, H) }));
+  const n = SOURCES.length;
+  const within48 = wins.filter(x => x.w && x.w.s < 48).length;
+  const any = wins.filter(x => x.w);
+  const v = $('verdict'), vs = $('verdictSub');
+  if (!n) { v.textContent = 'Inga prognoser kunde hämtas'; v.className = 'verdict bad'; vs.textContent = ''; }
+  else if (within48 > 0) {
+    const earliest = Math.min(...wins.filter(x => x.w).map(x => x.w.s));
+    v.className = 'verdict good';
+    v.textContent = within48 + ' av ' + n + ' prognoser ger ett startfönster inom 48 timmar';
+    vs.textContent = 'Tidigast: ' + (earliest === 0 ? 'nu' : fmtTime(GRID[earliest])) + ' (≤ ' + T + ' °C i minst ' + H + ' h i sträck)';
+  } else if (any.length) {
+    const earliest = Math.min(...any.map(x => x.w.s));
+    v.className = 'verdict bad';
+    v.textContent = 'Inget fönster inom 48 h – ' + any.length + ' av ' + n + ' ser ett fönster senare i veckan';
+    vs.textContent = 'Tidigast: ' + fmtTime(GRID[earliest]);
+  } else {
+    v.className = 'verdict bad';
+    v.textContent = 'Ingen prognos når ≤ ' + T + ' °C i ' + H + ' h i sträck de kommande 7 dygnen';
+    vs.textContent = '';
+  }
+
+  $('errors').textContent = FAILED.length ? 'Kunde inte hämta: ' + FAILED.map(f => f.name + ' (' + f.error + ')').join(', ') : '';
+  $('legend').innerHTML = SOURCES.map(s => '<span><i style="background:' + s.color + '"></i>' + s.name + '</span>').join('');
+
+  // Tabell: första fönster
+  let h = '<tr><th>Prognos</th><th>Min 24 h</th><th>Min 48 h</th><th>Min 7 dygn</th><th>Första fönster</th><th>Varar till</th></tr>';
+  for (const { s, w } of wins) {
+    h += '<tr><td><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + s.color + ';margin-right:6px"></i>' + s.name + '</td>' +
+      '<td>' + fmtT(minOf(s.vals.slice(0, 24))) + '</td><td>' + fmtT(minOf(s.vals.slice(0, 48))) + '</td><td>' + fmtT(minOf(s.vals)) + '</td>' +
+      '<td>' + (w ? (w.s === 0 ? '<b>Nu</b>' : fmtTime(GRID[w.s])) : '<span style="color:var(--mut)">Inget</span>') + '</td>' +
+      '<td>' + (w ? (w.open ? 'bortom prognosen' : fmtTime(GRID[w.e - 1] + 3600e3)) : '') + '</td></tr>';
+  }
+  $('tbl').innerHTML = h;
+
+  // Per dygn
+  const keys = [...new Set(GRID.map(dayKey))].slice(0, 8);
+  let d = '<tr><th>Prognos</th>' + keys.map(k => '<th class="c">' + new Date(k + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' }) + '</th>').join('') + '</tr>';
+  for (const s of SOURCES) {
+    d += '<tr><td>' + s.name + '</td>';
+    for (const k of keys) {
+      const idx = GRID.map((t, i) => dayKey(t) === k ? i : -1).filter(i => i >= 0);
+      const vals = idx.map(i => s.vals[i]).filter(x => x != null);
+      if (!vals.length) { d += '<td class="c warm">–</td>'; continue; }
+      const mn = Math.min(...vals), cnt = vals.filter(x => x <= T).length;
+      d += '<td class="c ' + (cnt >= H ? 'cold' : 'warm') + '">' + fmtT(mn) + ' · ' + cnt + ' h</td>';
+    }
+    d += '</tr>';
+  }
+  $('days').innerHTML = d;
+
+  $('foot').innerHTML = 'Datakällor: Open-Meteo (ECMWF, GFS, ICON, Météo-France, UK Met Office, DMI), Yr/Met Norway och SMHI. ' +
+    'Prognoserna avser lufttemperatur vid prognospunkten och kan avvika från mätningen vid stadion. Sidan hämtar ny data automatiskt var 30:e minut.';
+  drawChart(T);
+}
+
+function drawChart(T) {
+  const cv = $('chart'), dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, Hh = cv.clientHeight;
+  cv.width = W * dpr; cv.height = Hh * dpr;
+  const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const css = getComputedStyle(document.documentElement);
+  const mut = css.getPropertyValue('--mut').trim(), line = css.getPropertyValue('--line').trim(), coldbg = css.getPropertyValue('--coldbg').trim(), cold = css.getPropertyValue('--cold').trim();
+  const all = SOURCES.flatMap(s => s.vals).filter(x => x != null);
+  g.clearRect(0, 0, W, Hh);
+  if (!all.length) return;
+  let lo = Math.min(...all, T) - 2, hi = Math.max(...all, T) + 2;
+  const L = 38, R = 10, Tp = 10, B = 28, pw = W - L - R, ph = Hh - Tp - B;
+  const X = i => L + pw * i / (HOURS - 1), Y = v => Tp + ph * (hi - v) / (hi - lo);
+  g.fillStyle = coldbg; g.fillRect(L, Y(T), pw, Tp + ph - Y(T));
+  g.font = '11px system-ui'; g.fillStyle = mut; g.strokeStyle = line; g.lineWidth = 1;
+  const step = (hi - lo) > 24 ? 5 : 2;
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(L + pw, Y(v)); g.stroke();
+    g.textAlign = 'right'; g.fillText(String(v).replace('-', '−') + '°', L - 5, Y(v) + 4);
+  }
+  let lastDay = '';
+  GRID.forEach((t, i) => {
+    const k = dayKey(t);
+    if (k !== lastDay) {
+      lastDay = k;
+      g.beginPath(); g.moveTo(X(i), Tp); g.lineTo(X(i), Tp + ph); g.stroke();
+      g.textAlign = 'left';
+      g.fillText(new Date(t).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', timeZone: TZ }), X(i) + 3, Hh - 10);
+    }
+  });
+  g.strokeStyle = cold; g.setLineDash([6, 4]); g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(L, Y(T)); g.lineTo(L + pw, Y(T)); g.stroke(); g.setLineDash([]);
+  g.fillStyle = cold; g.textAlign = 'right'; g.fillText('gräns ' + String(T).replace('-', '−') + '°', L + pw - 4, Y(T) - 5);
+  g.lineWidth = 2; g.lineJoin = 'round';
+  for (const s of SOURCES) {
+    g.strokeStyle = s.color; g.beginPath(); let pen = false;
+    s.vals.forEach((v, i) => {
+      if (v == null) { pen = false; return; }
+      if (!pen) { g.moveTo(X(i), Y(v)); pen = true; } else g.lineTo(X(i), Y(v));
+    });
+    g.stroke();
+  }
+}
+
+$('thr').addEventListener('input', render);
+$('hrs').addEventListener('input', render);
+$('reload').addEventListener('click', loadAll);
+window.addEventListener('resize', () => SOURCES.length && drawChart(+$('thr').value));
+loadAll();
+setInterval(loadAll, 30 * 60 * 1000);
+</script>
+</body>
+</html>
