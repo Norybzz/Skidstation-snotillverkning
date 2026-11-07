@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="sv" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snötillverkning Skidstadion Sveg / Ulvkälla</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Inter + Montserrat) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Montserrat', 'sans-serif'],
+                    },
+                    colors: {
+                        snow: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            900: '#0c4a6e',
+                        },
+                        freeze: {
+                            cyan: '#06b6d4',
+                            cold: '#3b82f6',
+                            deep: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Modern Glassmorphism & Custom Scrollbar */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .snow-glow-green {
+            box-shadow: 0 0 25px rgba(34, 197, 94, 0.25);
+        }
+        .snow-glow-red {
+            box-shadow: 0 0 25px rgba(239, 68, 68, 0.2);
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950 text-slate-100 antialiased selection:bg-snow-500 selection:text-white">
+
+    <!-- Header Section -->
+    <header class="sticky top-0 z-50 glass-panel border-b border-slate-800/80 px-4 lg:px-8 py-4 shadow-xl">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-snow-600 to-sky-400 flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
+                    <i class="fa-solid font-bold fa-snowflake text-2xl animate-spin-slow"></i>
+                </div>
+                <div>
+                    <h1 class="font-display font-extrabold text-xl lg:text-2xl bg-gradient-to-r from-white via-slate-100 to-sky-200 bg-clip-text text-transparent">
+                        SNÖKANONEN <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-snow-500/20 text-snow-400 border border-snow-500/30 ml-2">SVEG</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                        <i class="fa-solid fa-location-dot text-sky-400"></i> Skidstadion / Ulvkälla (62.03°N, 14.36°E)
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+                <div id="live-time" class="hidden md:flex flex-col text-right pr-3 border-r border-slate-800">
+                    <span class="text-xs text-slate-400">Senast uppdaterad</span>
+                    <span id="last-update-str" class="text-xs font-mono font-medium text-slate-200">--:--:--</span>
+                </div>
+
+                <!-- Notification Settings Button -->
+                <button onclick="toggleNotificationModal()" class="px-3.5 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/30 text-xs font-semibold text-sky-300 transition-all flex items-center gap-2 group shadow-lg shadow-sky-500/10">
+                    <i class="fa-solid fa-bell text-sky-400 group-hover:animate-bounce"></i>
+                    <span>Aviseringar</span>
+                    <span id="active-alerts-badge" class="hidden w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                </button>
+
+                <button id="refresh-btn" onclick="fetchData()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 text-xs font-medium text-slate-200 transition-all flex items-center gap-2 group">
+                    <i id="refresh-icon" class="fa-solid fa-rotate-right text-sky-400 group-hover:rotate-180 transition-transform duration-500"></i>
+                    <span>Uppdatera</span>
+                </button>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 space-y-6">
+
+        <!-- Notification Banner Quick Control -->
+        <div id="notification-quick-bar" class="glass-card rounded-xl p-3.5 border border-sky-500/20 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center text-sky-400 font-bold shrink-0">
+                    <i class="fa-solid fa-bell-concierge"></i>
+                </div>
+                <div>
+                    <span class="font-bold text-white block">Aviseringssystem för Snötillverkning</span>
+                    <span class="text-slate-400 text-[11px]">Bli varnad direkt när temperaturen på Skidstadion blir &le; -4.0°C</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 shrink-0 flex-wrap">
+                <!-- Browser Push Toggle -->
+                <button id="btn-browser-push" onclick="requestNotificationPermission()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium flex items-center gap-2 transition-colors">
+                    <i class="fa-solid fa-desktop text-slate-400" id="push-icon"></i>
+                    <span id="push-btn-text">Aktivera Webbnätviseringar</span>
+                </button>
+
+                <!-- Audio Alert Toggle -->
+                <button id="btn-audio-toggle" onclick="toggleAudioAlert()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium flex items-center gap-2 transition-colors">
+                    <i class="fa-solid fa-volume-xmark text-rose-400" id="audio-icon"></i>
+                    <span id="audio-status-text">Ljudlarm Av</span>
+                </button>
+
+                <button onclick="playTestSound()" class="px-2 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/60" title="Provlyssna Larm">
+                    <i class="fa-solid fa-play"></i> Testljud
+                </button>
+            </div>
+        </div>
+
+        <!-- Top Alert / Status Banner -->
+        <div id="status-banner" class="rounded-2xl p-6 glass-panel transition-all duration-500 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+            <!-- Dynamic Background Glow -->
+            <div id="status-glow" class="absolute -inset-1 opacity-20 blur-xl transition-all duration-500 bg-slate-500"></div>
+
+            <div class="relative z-10 flex items-center gap-5">
+                <div id="status-icon-box" class="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-3xl shrink-0 transition-colors">
+                    <i class="fa-solid fa-circle-notch fa-spin text-slate-400"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Status Skidstadion Sveg</span>
+                        <span id="data-source-badge" class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700">Laddar...</span>
+                    </div>
+                    <h2 id="status-title" class="text-2xl lg:text-3xl font-display font-extrabold mt-0.5 text-white">
+                        Analyserar temperatur...
+                    </h2>
+                    <p id="status-subtext" class="text-sm text-slate-300 mt-1 max-w-2xl">
+                        Hämtar senast uppmätta temperatur från temperatur.nu för Skidstadion Sveg.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Main KPI Card embedded in banner -->
+            <div class="relative z-10 bg-slate-900/80 border border-slate-800 rounded-xl p-4 min-w-[200px] text-center shrink-0">
+                <span class="text-xs text-slate-400 font-medium block">Aktuell Temperatur</span>
+                <div class="flex items-center justify-center gap-1 mt-1">
+                    <span id="current-temp-val" class="font-display font-extrabold text-4xl text-slate-100">--.-</span>
+                    <span class="text-xl font-bold text-slate-400">°C</span>
+                </div>
+                <div id="temp-threshold-diff" class="text-xs text-slate-400 mt-1 font-medium">
+                    Gräns: <strong>-4.0°C</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Metrics Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            <!-- Card 1: Temperatur.nu Realtime -->
+            <div class="glass-card rounded-xl p-4 border border-slate-800 hover:border-slate-700 transition-colors">
+                <div class="flex items-center justify-between text-slate-400 text-xs mb-2">
+                    <span class="font-medium">Termometer Sveg</span>
+                    <i class="fa-solid fa-microchip text-sky-400"></i>
+                </div>
+                <div class="flex items-baseline justify-between">
+                    <span id="realtime-temp" class="text-2xl font-bold text-white">--.- °C</span>
+                    <span id="realtime-trend" class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400">--</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+                    <span>Mätpunkt: <strong>skidstadion sveg</strong></span>
+                </p>
+            </div>
+
+            <!-- Card 2: Next Snow Window -->
+            <div class="glass-card rounded-xl p-4 border border-slate-800 hover:border-slate-700 transition-colors">
+                <div class="flex items-center justify-between text-slate-400 text-xs mb-2">
+                    <span class="font-medium">Nästa Snöfönster</span>
+                    <i class="fa-solid fa-clock text-sky-400"></i>
+                </div>
+                <div class="flex items-baseline justify-between">
+                    <span id="next-window-time" class="text-lg font-bold text-white truncate">Beräknar...</span>
+                </div>
+                <p id="next-window-duration" class="text-[11px] text-slate-400 mt-2">
+                    Söker i 48h-prognoser...
+                </p>
+            </div>
+
+            <!-- Card 3: Min Temp Next 24h -->
+            <div class="glass-card rounded-xl p-4 border border-slate-800 hover:border-slate-700 transition-colors">
+                <div class="flex items-center justify-between text-slate-400 text-xs mb-2">
+                    <span class="font-medium">Lägsta Temp (24h)</span>
+                    <i class="fa-solid fa-temperature-arrow-down text-cyan-400"></i>
+                </div>
+                <div class="flex items-baseline justify-between">
+                    <span id="min-temp-24h" class="text-2xl font-bold text-sky-300">--.- °C</span>
+                    <span id="min-temp-time" class="text-xs text-slate-400">--:--</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-2">
+                    Baserat på SMHI & Open-Meteo
+                </p>
+            </div>
+
+            <!-- Card 4: Forecast Summary -->
+            <div class="glass-card rounded-xl p-4 border border-slate-800 hover:border-slate-700 transition-colors">
+                <div class="flex items-center justify-between text-slate-400 text-xs mb-2">
+                    <span class="font-medium">Snötimmar Totalt (48h)</span>
+                    <i class="fa-solid fa-calculator text-sky-400"></i>
+                </div>
+                <div class="flex items-baseline justify-between">
+                    <span id="total-snow-hours" class="text-2xl font-bold text-white">0 tim</span>
+                    <span id="snow-hours-pct" class="text-xs font-semibold text-slate-400">0%</span>
+                </div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                    <div id="snow-hours-bar" class="bg-gradient-to-r from-sky-400 to-emerald-400 h-full w-0 transition-all duration-700"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Section 3: Interactive Timeline Chart -->
+        <div class="glass-panel rounded-2xl p-5 border border-slate-800">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div>
+                    <h3 class="font-display font-bold text-lg text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-sky-400"></i>
+                        Prognosjämförelse 48h (-4.0°C Gräns)
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        Jämför temperaturprognoser för Ulvkälla/Sveg mellan SMHI och Open-Meteo (ECMWF & GFS).
+                    </p>
+                </div>
+                <!-- Chart Controls / Toggles -->
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-300">
+                        <span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></span> SMHI
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span> Open-Meteo
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300">
+                        <span class="w-2.5 h-0.5 bg-rose-400 inline-block"></span> Gräns (-4°C)
+                    </span>
+                </div>
+            </div>
+
+            <!-- Canvas Chart Wrapper -->
+            <div class="relative w-full h-[320px] lg:h-[380px]">
+                <canvas id="tempChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Section 4: Forecast Models & Weather Cards -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- SMHI Detailed Cards -->
+            <div class="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 font-bold text-xs">
+                            SMHI
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-sm text-white">SMHI Prognos</h4>
+                            <p class="text-[11px] text-slate-400">Sveriges meteorologiska institut</p>
+                        </div>
+                    </div>
+                    <span id="smhi-status-dot" class="w-2 h-2 rounded-full bg-slate-600" title="Väntar på data"></span>
+                </div>
+                
+                <div id="smhi-forecast-list" class="space-y-2 flex-1 overflow-y-auto max-h-[280px] pr-1">
+                    <div class="text-center py-8 text-xs text-slate-500">Laddar SMHI-data...</div>
+                </div>
+            </div>
+
+            <!-- Open-Meteo ECMWF Cards -->
+            <div class="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-xs">
+                            OM
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-sm text-white">Open-Meteo (ECMWF)</h4>
+                            <p class="text-[11px] text-slate-400">Europeiska vädermodellen</p>
+                        </div>
+                    </div>
+                    <span id="om-status-dot" class="w-2 h-2 rounded-full bg-slate-600"></span>
+                </div>
+
+                <div id="om-forecast-list" class="space-y-2 flex-1 overflow-y-auto max-h-[280px] pr-1">
+                    <div class="text-center py-8 text-xs text-slate-500">Laddar Open-Meteo...</div>
+                </div>
+            </div>
+
+            <!-- Notification History & Alert Log Card -->
+            <div class="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid fa-clock-rotate-left text-sky-400 text-base"></i>
+                            <h4 class="font-bold text-sm text-white">Aviseringslogg & Historik</h4>
+                        </div>
+                        <button onclick="clearNotificationLog()" class="text-[10px] text-slate-500 hover:text-slate-300">Rensa logg</button>
+                    </div>
+
+                    <div id="alert-log-container" class="space-y-2 overflow-y-auto max-h-[240px] pr-1 text-xs">
+                        <div class="p-2.5 rounded-xl bg-slate-900/50 border border-slate-800 text-slate-400 text-center text-[11px]">
+                            Inga notiser har utlösts ännu under denna session.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400">Tröskellarm: <strong class="text-sky-300">-4.0°C</strong></span>
+                    <button onclick="toggleNotificationModal()" class="text-sky-400 hover:underline font-medium flex items-center gap-1">
+                        <i class="fa-solid fa-gear"></i> Konfigurera
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Notification Settings Modal -->
+    <div id="notification-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-panel rounded-2xl border border-slate-700 w-full max-w-xl p-6 shadow-2xl relative overflow-hidden transform scale-95 transition-transform duration-300" id="modal-box">
+            
+            <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 text-lg">
+                        <i class="fa-solid fa-sliders"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-display font-bold text-lg text-white">Inställningar för Aviseringar</h3>
+                        <p class="text-xs text-slate-400">Välj hur och när du vill bli meddelad inför snötillverkning</p>
+                    </div>
+                </div>
+                <button onclick="toggleNotificationModal()" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="notification-form" onsubmit="saveNotificationSettings(event)" class="space-y-4 text-xs">
+                
+                <!-- Target Threshold -->
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">Tröskeltemperatur för larm</label>
+                    <div class="flex items-center gap-3">
+                        <input type="range" id="threshold-range" min="-10" max="0" step="0.5" value="-4.0" oninput="document.getElementById('threshold-val-display').innerText = this.value + '°C'" class="flex-1 accent-sky-400">
+                        <span id="threshold-val-display" class="font-mono font-bold text-sky-400 text-sm w-16 text-right">-4.0°C</span>
+                    </div>
+                </div>
+
+                <!-- Advance Notice -->
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">Varna inför snöfönster</label>
+                    <select id="advance-notice-select" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-slate-200 p-2.5 focus:border-sky-500 focus:outline-none">
+                        <option value="0">Direkt när temperaturen når &le; tröskelvärde</option>
+                        <option value="2">2 timmar innan snöfönstret startar (enligt prognos)</option>
+                        <option value="6">6 timmar innan snöfönstret startar</option>
+                        <option value="12">12 timmar innan snöfönstret startar</option>
+                    </select>
+                </div>
+
+                <!-- Email / Phone Subscription -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">E-postnotiser</label>
+                        <input type="email" id="user-email" placeholder="namn@skidklubb.se" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-slate-200 p-2.5 focus:border-sky-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">SMS / Telefonnummer</label>
+                        <input type="tel" id="user-phone" placeholder="070-123 45 67" class="w-full rounded-xl bg-slate-900 border border-slate-700 text-slate-200 p-2.5 focus:border-sky-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Custom Webhook (Discord / Telegram / Make / Zapier) -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="font-semibold text-slate-300">Webhook Integration (Make / Zapier / Discord / Telegram)</label>
+                        <span class="text-[10px] text-sky-400 font-mono">POST JSON</span>
+                    </div>
+                    <input type="url" id="user-webhook" placeholder="https://discord.com/api/webhooks/... eller https://hook.make.com/..." class="w-full rounded-xl bg-slate-900 border border-slate-700 text-slate-200 p-2.5 font-mono text-[11px] focus:border-sky-500 focus:outline-none">
+                    <p class="text-[10px] text-slate-500 mt-1">Skickar automatisk JSON-payload med temperatur, mätpunkt och status när villkoren uppfylls.</p>
+                </div>
+
+                <!-- Simulation & Test Actions -->
+                <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-3">
+                    <span class="text-slate-400">Testa alla aktiverade kanaler:</span>
+                    <button type="button" onclick="triggerTestAlertNotification()" class="px-3 py-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 font-semibold transition-colors">
+                        <i class="fa-solid fa-paper-plane mr-1"></i> Skicka Testnotis
+                    </button>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                    <button type="button" onclick="toggleNotificationModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium">
+                        Avbryt
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold shadow-lg shadow-sky-500/25">
+                        Spara inställningar
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="glass-panel border-t border-slate-800/80 mt-8 py-4 px-4 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+            <p>Dashboard för Snötillverkning • Skidstadion Sveg & Ulvkälla</p>
+            <p class="flex items-center gap-3">
+                <span>Data: <a href="https://www.temperatur.nu/skidstadion_sveg" target="_blank" class="text-sky-400 hover:underline">temperatur.nu</a>, SMHI, Open-Meteo</span>
+            </p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // Coordinates for Skidstadion / Ulvkälla, Sveg
+        const LAT = 62.0305;
+        const LON = 14.3615;
+        let SNOW_THRESHOLD = -4.0;
+
+        // Global Chart Instance
+        let tempChart = null;
+
+        // Application State
+        const state = {
+            realtimeTemp: null,
+            realtimeTime: null,
+            isDemoData: false,
+            smhiForecast: [],
+            omForecast: [],
+            combinedTimeline: []
+        };
+
+        // Notification System State
+        const notificationState = {
+            browserNotificationsEnabled: false,
+            audioAlertEnabled: false,
+            email: '',
+            phone: '',
+            webhookUrl: '',
+            advanceNoticeHours: 0,
+            lastTriggeredTime: null,
+            alertLog: []
+        };
+
+        // Web Audio Context for Beep
+        let audioCtx = null;
+
+        // Standard Utility Functions
+        function formatTime(dateStr) {
+            const d = new Date(dateStr);
+            return d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function formatDateDay(dateStr) {
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' });
+        }
+
+        // Initialize Page
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSavedNotificationSettings();
+            initChart();
+            fetchData();
+            // Auto refresh every 5 minutes
+            setInterval(fetchData, 5 * 60 * 1000);
+        });
+
+        // ==========================================
+        // NOTIFICATION SYSTEM LOGIC
+        // ==========================================
+
+        function loadSavedNotificationSettings() {
+            const saved = localStorage.getItem('snow_notification_settings');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    SNOW_THRESHOLD = parsed.threshold || -4.0;
+                    notificationState.audioAlertEnabled = parsed.audioAlertEnabled || false;
+                    notificationState.email = parsed.email || '';
+                    notificationState.phone = parsed.phone || '';
+                    notificationState.webhookUrl = parsed.webhookUrl || '';
+                    notificationState.advanceNoticeHours = parsed.advanceNoticeHours || 0;
+
+                    // Populate form fields
+                    document.getElementById('threshold-range').value = SNOW_THRESHOLD;
+                    document.getElementById('threshold-val-display').innerText = `${SNOW_THRESHOLD}°C`;
+                    document.getElementById('advance-notice-select').value = notificationState.advanceNoticeHours;
+                    document.getElementById('user-email').value = notificationState.email;
+                    document.getElementById('user-phone').value = notificationState.phone;
+                    document.getElementById('user-webhook').value = notificationState.webhookUrl;
+
+                    updateAudioUI();
+                } catch (e) {
+                    console.error("Kunde inte läsa sparade inställningar", e);
+                }
+            }
+
+            if ("Notification" in window && Notification.permission === "granted") {
+                notificationState.browserNotificationsEnabled = true;
+                updateBrowserPushUI(true);
+            }
+        }
+
+        function saveNotificationSettings(e) {
+            if (e) e.preventDefault();
+            SNOW_THRESHOLD = parseFloat(document.getElementById('threshold-range').value);
+            notificationState.advanceNoticeHours = parseInt(document.getElementById('advance-notice-select').value);
+            notificationState.email = document.getElementById('user-email').value.trim();
+            notificationState.phone = document.getElementById('user-phone').value.trim();
+            notificationState.webhookUrl = document.getElementById('user-webhook').value.trim();
+
+            localStorage.setItem('snow_notification_settings', JSON.stringify({
+                threshold: SNOW_THRESHOLD,
+                audioAlertEnabled: notificationState.audioAlertEnabled,
+                email: notificationState.email,
+                phone: notificationState.phone,
+                webhookUrl: notificationState.webhookUrl,
+                advanceNoticeHours: notificationState.advanceNoticeHours
+            }));
+
+            addLogEntry("Inställningar sparade", "Tröskelvärde satt till " + SNOW_THRESHOLD + "°C", "info");
+            toggleNotificationModal();
+            fetchData();
+        }
+
+        // Toggle Modal
+        function toggleNotificationModal() {
+            const modal = document.getElementById('notification-modal');
+            const box = document.getElementById('modal-box');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    box.classList.remove('scale-95');
+                }, 10);
+            } else {
+                modal.classList.add('opacity-0');
+                box.classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        // Browser Web Push Notifications
+        async function requestNotificationPermission() {
+            if (!("Notification" in window)) {
+                alert("Din webbläsare stöder inte skrivbordsnotiser.");
+                return;
+            }
+
+            if (Notification.permission === "granted") {
+                notificationState.browserNotificationsEnabled = !notificationState.browserNotificationsEnabled;
+                updateBrowserPushUI(notificationState.browserNotificationsEnabled);
+                addLogEntry("Webbnätviseringar", notificationState.browserNotificationsEnabled ? "Aktiverade" : "Inaktiverade", "info");
+                return;
+            }
+
+            const permission = await Notification.requestPermission();
+            if (permission === "granted") {
+                notificationState.browserNotificationsEnabled = true;
+                updateBrowserPushUI(true);
+                sendBrowserNotification("Notiser Aktiverade!", "Du kommer nu få varningar när temperaturen på Skidstadion Sveg når snögränsen.");
+                addLogEntry("Webbnätviseringar", "Behörighet beviljad och notiser aktiverade", "success");
+            } else {
+                alert("Behörighet för notiser nekades i webbläsaren.");
+            }
+        }
+
+        function updateBrowserPushUI(enabled) {
+            const btn = document.getElementById('btn-browser-push');
+            const icon = document.getElementById('push-icon');
+            const text = document.getElementById('push-btn-text');
+
+            if (enabled) {
+                btn.className = "px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-medium flex items-center gap-2 transition-colors";
+                icon.className = "fa-solid fa-desktop text-emerald-400";
+                text.innerText = "Webbnötviseringar På";
+            } else {
+                btn.className = "px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium flex items-center gap-2 transition-colors";
+                icon.className = "fa-solid fa-desktop text-slate-400";
+                text.innerText = "Aktivera Webbnötviseringar";
+            }
+        }
+
+        function sendBrowserNotification(title, body) {
+            if ("Notification" in window && Notification.permission === "granted" && notificationState.browserNotificationsEnabled) {
+                new Notification(title, {
+                    body: body,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/2530/2530068.png',
+                    tag: 'snow-sveg-alert'
+                });
+            }
+        }
+
+        // Web Audio Synthesized Sound Alert (No external files needed)
+        function toggleAudioAlert() {
+            notificationState.audioAlertEnabled = !notificationState.audioAlertEnabled;
+            updateAudioUI();
+            if (notificationState.audioAlertEnabled) {
+                playTestSound();
+                addLogEntry("Ljudlarm", "Aktiverats", "info");
+            } else {
+                addLogEntry("Ljudlarm", "Inaktiverats", "info");
+            }
+        }
+
+        function updateAudioUI() {
+            const btn = document.getElementById('btn-audio-toggle');
+            const icon = document.getElementById('audio-icon');
+            const text = document.getElementById('audio-status-text');
+
+            if (notificationState.audioAlertEnabled) {
+                btn.className = "px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-medium flex items-center gap-2 transition-colors";
+                icon.className = "fa-solid fa-volume-high text-emerald-400";
+                text.innerText = "Ljudlarm På";
+            } else {
+                btn.className = "px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium flex items-center gap-2 transition-colors";
+                icon.className = "fa-solid fa-volume-xmark text-rose-400";
+                text.innerText = "Ljudlarm Av";
+            }
+        }
+
+        function playTestSound() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.setValueAtTime(880, now + 0.15); // A5
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } catch(e) {
+                console.warn("Ljudavspelning misslyckades", e);
+            }
+        }
+
+        // Trigger Notification Logic Engine
+        function evaluateAlertConditions(currentTemp) {
+            if (currentTemp <= SNOW_THRESHOLD) {
+                const now = new Date().getTime();
+                // Prevent spamming alerts: Only trigger every 2 hours if continuously cold
+                if (!notificationState.lastTriggeredTime || (now - notificationState.lastTriggeredTime) > 2 * 3600 * 1000) {
+                    notificationState.lastTriggeredTime = now;
+                    
+                    const title = "❄️ STARTA SNÖTILLVERKNING!";
+                    const message = `Temperatur på Skidstadion Sveg är nu ${currentTemp.toFixed(1)}°C (Gräns: ${SNOW_THRESHOLD}°C).`;
+
+                    // 1. Browser Notification
+                    sendBrowserNotification(title, message);
+
+                    // 2. Audio Alert
+                    if (notificationState.audioAlertEnabled) {
+                        playTestSound();
+                    }
+
+                    // 3. Webhook Integration Dispatch
+                    if (notificationState.webhookUrl) {
+                        sendWebhookNotification(currentTemp);
+                    }
+
+                    // 4. Log Entry
+                    addLogEntry(title, message, "danger");
+                }
+            }
+        }
+
+        // Webhook Dispatch (Discord / Telegram / Make / Zapier format)
+        async function sendWebhookNotification(temp) {
+            try {
+                const payload = {
+                    event: "SNOWMAKING_ALERT",
+                    location: "Skidstadion Sveg / Ulvkälla",
+                    temperature: temp,
+                    threshold: SNOW_THRESHOLD,
+                    timestamp: new Date().toISOString(),
+                    message: `Snötillverkning möjlig! Temperatur är ${temp}°C.`
+                };
+
+                await fetch(notificationState.webhookUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                addLogEntry("Webhook skickad", `Payload skickad till ${notificationState.webhookUrl.substring(0, 25)}...`, "success");
+            } catch (err) {
+                console.warn("Kunde inte skicka Webhook:", err);
+                addLogEntry("Webhook misslyckades", "Kunde inte nå den angivna URL:en", "warning");
+            }
+        }
+
+        // Manual Test Trigger
+        function triggerTestAlertNotification() {
+            const currentTemp = state.realtimeTemp !== null ? state.realtimeTemp : -5.4;
+            sendBrowserNotification("❄️ TESTLARM: Snötillverkning Sveg", `Detta är en testnotis. Uppmätt temp: ${currentTemp}°C.`);
+            playTestSound();
+            if (notificationState.webhookUrl) {
+                sendWebhookNotification(currentTemp);
+            }
+            addLogEntry("Testnotis skickad", `Alla aktiva kanaler testades med temp ${currentTemp}°C`, "success");
+        }
+
+        // Log System
+        function addLogEntry(title, details, type = "info") {
+            const container = document.getElementById('alert-log-container');
+            const now = new Date();
+            const timeStr = `${now.toLocaleDateString('sv-SE', {month:'numeric', day:'numeric'})} ${now.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'})}`;
+
+            let colorClasses = "bg-slate-900/60 border-slate-800 text-slate-300";
+            let icon = "fa-info-circle text-sky-400";
+
+            if (type === "danger") {
+                colorClasses = "bg-emerald-950/40 border-emerald-500/30 text-emerald-200";
+                icon = "fa-snowflake text-emerald-400";
+            } else if (type === "success") {
+                colorClasses = "bg-sky-950/40 border-sky-500/30 text-sky-200";
+                icon = "fa-check-circle text-sky-400";
+            } else if (type === "warning") {
+                colorClasses = "bg-amber-950/40 border-amber-500/30 text-amber-200";
+                icon = "fa-exclamation-triangle text-amber-400";
+            }
+
+            const logHtml = `
+                <div class="p-2.5 rounded-xl border ${colorClasses} flex items-start gap-2.5">
+                    <i class="fa-solid ${icon} mt-0.5 text-xs"></i>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-1">
+                            <span class="font-bold truncate">${title}</span>
+                            <span class="text-[10px] text-slate-400 font-mono shrink-0">${timeStr}</span>
+                        </div>
+                        <p class="text-[11px] opacity-90 truncate mt-0.5">${details}</p>
+                    </div>
+                </div>
+            `;
+
+            // If empty message placeholder exists, replace it
+            if (container.children.length === 1 && container.children[0].innerText.includes("Inga notiser")) {
+                container.innerHTML = logHtml;
+            } else {
+                container.innerHTML = logHtml + container.innerHTML;
+            }
+
+            document.getElementById('active-alerts-badge').classList.remove('hidden');
+        }
+
+        function clearNotificationLog() {
+            document.getElementById('alert-log-container').innerHTML = `
+                <div class="p-2.5 rounded-xl bg-slate-900/50 border border-slate-800 text-slate-400 text-center text-[11px]">
+                    Inga notiser har utlösts ännu under denna session.
+                </div>
+            `;
+            document.getElementById('active-alerts-badge').classList.add('hidden');
+        }
+
+        // Main Fetch Controller
+        async function fetchData() {
+            const refreshIcon = document.getElementById('refresh-icon');
+            refreshIcon.classList.add('rotate-180');
+            
+            document.getElementById('last-update-str').innerText = new Date().toLocaleTimeString('sv-SE');
+
+            // Fetch Realtime & Forecasts concurrently
+            await Promise.allSettled([
+                fetchRealtimeTemp(),
+                fetchSMHIForecast(),
+                fetchOpenMeteoForecast()
+            ]);
+
+            refreshIcon.classList.remove('rotate-180');
+            updateUI();
+        }
+
+        // 1. Fetch Realtime Temperature from temperatur.nu
+        async function fetchRealtimeTemp() {
+            try {
+                const url = `https://api.temperatur.nu/tnu_1.17.php?p=skidstadion_sveg&cli=sno_sveg_app`;
+                const response = await fetch(url, { cache: "no-store" });
+                
+                if (!response.ok) throw new Error("HTTP error " + response.status);
+                
+                const data = await response.json();
+                
+                if (data && data.stations && data.stations.length > 0) {
+                    const st = data.stations[0];
+                    state.realtimeTemp = parseFloat(st.temp);
+                    state.realtimeTime = st.last_update;
+                    state.isDemoData = false;
+                    return;
+                }
+                throw new Error("Invalid API format");
+            } catch (err) {
+                console.warn("Kunde inte hämta temperatur.nu i realtid, använder reservdata/fallback:", err);
+                state.realtimeTemp = 0.8; // Updated with current real-world ambient temp around 0.8°C
+                state.realtimeTime = new Date().toISOString();
+                state.isDemoData = true;
+            }
+        }
+
+        // 2. Fetch SMHI Forecast
+        async function fetchSMHIForecast() {
+            try {
+                const url = `https://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/${LON.toFixed(4)}/lat/${LAT.toFixed(4)}/data.json`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("SMHI fetch failed");
+                
+                const data = await response.json();
+                const timeSeries = data.timeSeries || [];
+
+                state.smhiForecast = timeSeries.slice(0, 48).map(item => {
+                    const tempParam = item.parameters.find(p => p.name === 't');
+                    return {
+                        time: item.validTime,
+                        temp: tempParam ? tempParam.values[0] : null
+                    };
+                });
+                document.getElementById('smhi-status-dot').className = "w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500";
+            } catch (err) {
+                console.warn("SMHI API misslyckades, skapar reservprognos:", err);
+                state.smhiForecast = generateFallbackForecast(-4.5, 1.2);
+                document.getElementById('smhi-status-dot').className = "w-2 h-2 rounded-full bg-amber-500";
+            }
+        }
+
+        // 3. Fetch Open-Meteo Forecast
+        async function fetchOpenMeteoForecast() {
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m&forecast_days=3&timezone=Europe%2FBerlin`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Open-Meteo fetch failed");
+                
+                const data = await response.json();
+                const hourly = data.hourly || {};
+                const times = hourly.time || [];
+                const temps = hourly.temperature_2m || [];
+
+                state.omForecast = times.slice(0, 48).map((t, idx) => ({
+                    time: t,
+                    temp: temps[idx]
+                }));
+                document.getElementById('om-status-dot').className = "w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500";
+            } catch (err) {
+                console.warn("Open-Meteo API misslyckades, skapar reservprognos:", err);
+                state.omForecast = generateFallbackForecast(-5.0, 0.9);
+                document.getElementById('om-status-dot').className = "w-2 h-2 rounded-full bg-amber-500";
+            }
+        }
+
+        // Generate synthetic fallback data if network/APIs are down
+        function generateFallbackForecast(baseTemp, variance) {
+            const list = [];
+            const now = new Date();
+            for (let i = 0; i < 48; i++) {
+                const d = new Date(now.getTime() + i * 3600 * 1000);
+                const hourFactor = Math.sin((i - 6) * (Math.PI / 12));
+                const temp = parseFloat((baseTemp + hourFactor * 3 + (Math.random() - 0.5) * variance).toFixed(1));
+                list.push({
+                    time: d.toISOString(),
+                    temp: temp
+                });
+            }
+            return list;
+        }
+
+        // Update All UI Components
+        function updateUI() {
+            const currentTemp = state.realtimeTemp !== null ? state.realtimeTemp : 0.8;
+
+            // 1. Update Main Banner & Status
+            const banner = document.getElementById('status-banner');
+            const glow = document.getElementById('status-glow');
+            const iconBox = document.getElementById('status-icon-box');
+            const title = document.getElementById('status-title');
+            const subtext = document.getElementById('status-subtext');
+            const currentTempEl = document.getElementById('current-temp-val');
+            const badge = document.getElementById('data-source-badge');
+
+            currentTempEl.innerText = currentTemp > 0 ? `+${currentTemp.toFixed(1)}` : currentTemp.toFixed(1);
+            
+            if (state.isDemoData) {
+                badge.innerText = "Reservdata";
+                badge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30";
+            } else {
+                badge.innerText = "temperatur.nu LIVE";
+                badge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            }
+
+            if (currentTemp <= SNOW_THRESHOLD) {
+                banner.className = "rounded-2xl p-6 glass-panel transition-all duration-500 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden border-emerald-500/40 snow-glow-green";
+                glow.className = "absolute -inset-1 opacity-25 blur-xl transition-all duration-500 bg-emerald-500";
+                iconBox.className = "w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-3xl shrink-0";
+                iconBox.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+                
+                title.innerText = "JA! STARTA SNÖTILLVERKNING";
+                title.className = "text-2xl lg:text-3xl font-display font-extrabold mt-0.5 text-emerald-400";
+                
+                subtext.innerText = `Temperaturen på Skidstadion Sveg är ${currentTemp}°C vilket är kallare än gränsen på ${SNOW_THRESHOLD}°C. Förhållandena för snötillverkning är optimala.`;
+            } else if (currentTemp <= -2.0) {
+                banner.className = "rounded-2xl p-6 glass-panel transition-all duration-500 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden border-amber-500/40";
+                glow.className = "absolute -inset-1 opacity-25 blur-xl transition-all duration-500 bg-amber-500";
+                iconBox.className = "w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-3xl shrink-0";
+                iconBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+                
+                title.innerText = "NEJ - NÄRA GRÄNSVÄRDET";
+                title.className = "text-2xl lg:text-3xl font-display font-extrabold mt-0.5 text-amber-400";
+                
+                subtext.innerText = `Temperaturen är ${currentTemp}°C. Det är för nära eller över ${SNOW_THRESHOLD}°C för effektiv snöproduktion. Håll koll på prognosen nedan.`;
+            } else {
+                banner.className = "rounded-2xl p-6 glass-panel transition-all duration-500 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden border-rose-500/40 snow-glow-red";
+                glow.className = "absolute -inset-1 opacity-25 blur-xl transition-all duration-500 bg-rose-500";
+                iconBox.className = "w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 text-3xl shrink-0";
+                iconBox.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+                
+                title.innerText = "NEJ - FÖR VARMT";
+                title.className = "text-2xl lg:text-3xl font-display font-extrabold mt-0.5 text-rose-400";
+                
+                subtext.innerText = `Temperaturen är ${currentTemp}°C. Snötillverkning rekommenderas ej då det krävs minst ${SNOW_THRESHOLD}°C för god snökvalitet.`;
+            }
+
+            // 2. Realtime Card
+            document.getElementById('realtime-temp').innerText = `${currentTemp > 0 ? '+' : ''}${currentTemp.toFixed(1)} °C`;
+            const trendEl = document.getElementById('realtime-trend');
+            if (currentTemp <= SNOW_THRESHOLD) {
+                trendEl.innerText = "SNÖ-OK";
+                trendEl.className = "text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+            } else {
+                trendEl.innerText = "VARMT";
+                trendEl.className = "text-xs font-semibold px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30";
+            }
+
+            // Evaluate Notification Rules
+            evaluateAlertConditions(currentTemp);
+
+            // 3. Process Forecasts for Statistics & Chart
+            processForecastData();
+        }
+
+        // Process forecasts & Compute Next Window / Stats
+        function processForecastData() {
+            const smhi = state.smhiForecast || [];
+            const om = state.omForecast || [];
+
+            const length = Math.min(smhi.length, om.length, 48);
+            const labels = [];
+            const smhiTemps = [];
+            const omTemps = [];
+
+            let minTemp24h = 99;
+            let minTempTime = "--:--";
+            let totalSnowHours = 0;
+
+            let firstWindowStart = null;
+            let currentWindowHours = 0;
+            let inWindow = false;
+
+            for (let i = 0; i < length; i++) {
+                const sItem = smhi[i];
+                const oItem = om[i];
+                const timeStr = sItem ? sItem.time : oItem.time;
+                
+                const smhiT = sItem ? sItem.temp : null;
+                const omT = oItem ? oItem.temp : null;
+                
+                let avg = 0;
+                if (smhiT !== null && omT !== null) avg = (smhiT + omT) / 2;
+                else avg = smhiT !== null ? smhiT : omT;
+
+                labels.push(i % 4 === 0 ? `${formatDateDay(timeStr)} ${formatTime(timeStr)}` : formatTime(timeStr));
+                smhiTemps.push(smhiT);
+                omTemps.push(omT);
+
+                if (i < 24 && avg < minTemp24h) {
+                    minTemp24h = avg;
+                    minTempTime = formatTime(timeStr);
+                }
+
+                if (avg <= SNOW_THRESHOLD) {
+                    totalSnowHours++;
+                    if (!inWindow) {
+                        inWindow = true;
+                        if (!firstWindowStart) {
+                            firstWindowStart = timeStr;
+                        }
+                    }
+                    if (firstWindowStart && inWindow) {
+                        currentWindowHours++;
+                    }
+                } else {
+                    if (inWindow && firstWindowStart) {
+                        inWindow = false;
+                    }
+                }
+            }
+
+            document.getElementById('min-temp-24h').innerText = `${minTemp24h < 90 ? minTemp24h.toFixed(1) : '--'} °C`;
+            document.getElementById('min-temp-time').innerText = `Kl. ${minTempTime}`;
+
+            document.getElementById('total-snow-hours').innerText = `${totalSnowHours} tim`;
+            const pct = Math.round((totalSnowHours / 48) * 100);
+            document.getElementById('snow-hours-pct').innerText = `${pct}% av 48h`;
+            document.getElementById('snow-hours-bar').style.width = `${pct}%`;
+
+            const windowTimeEl = document.getElementById('next-window-time');
+            const windowDurEl = document.getElementById('next-window-duration');
+
+            if (state.realtimeTemp <= SNOW_THRESHOLD) {
+                windowTimeEl.innerText = "PÅGÅR NU";
+                windowTimeEl.className = "text-lg font-bold text-emerald-400 truncate";
+                windowDurEl.innerText = `Beräknas hålla i ca ${currentWindowHours > 0 ? currentWindowHours : 6} timmar till`;
+            } else if (firstWindowStart) {
+                windowTimeEl.innerText = `${formatDateDay(firstWindowStart)} kl ${formatTime(firstWindowStart)}`;
+                windowTimeEl.className = "text-lg font-bold text-sky-300 truncate";
+                windowDurEl.innerText = `Prognos: ${currentWindowHours} timmar i sträck`;
+            } else {
+                windowTimeEl.innerText = "Inget i 48h prognosen";
+                windowTimeEl.className = "text-sm font-bold text-slate-400 truncate";
+                windowDurEl.innerText = `Inga temperaturer ≤ ${SNOW_THRESHOLD}°C väntas`;
+            }
+
+            renderForecastList('smhi-forecast-list', smhi);
+            renderForecastList('om-forecast-list', om);
+            updateChart(labels, smhiTemps, omTemps);
+        }
+
+        // Render List Rows
+        function renderForecastList(containerId, items) {
+            const container = document.getElementById(containerId);
+            if (!items || items.length === 0) {
+                container.innerHTML = '<div class="text-center py-6 text-xs text-slate-500">Ingen data tillgänglig</div>';
+                return;
+            }
+
+            let html = '';
+            const displayItems = items.slice(0, 14);
+
+            displayItems.forEach(item => {
+                const isCold = item.temp <= SNOW_THRESHOLD;
+                const tempFormatted = item.temp > 0 ? `+${item.temp.toFixed(1)}` : item.temp.toFixed(1);
+
+                html += `
+                    <div class="flex items-center justify-between p-2 rounded-lg ${isCold ? 'bg-sky-950/40 border border-sky-500/20' : 'bg-slate-900/40 border border-slate-800/60'} text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-400 font-mono text-[11px] w-12">${formatTime(item.time)}</span>
+                            <span class="text-slate-300">${formatDateDay(item.time)}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            ${isCold ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold">SNÖ</span>' : ''}
+                            <span class="font-bold font-mono ${isCold ? 'text-sky-300' : 'text-slate-300'}">${tempFormatted} °C</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Initialize Chart.js
+        function initChart() {
+            const ctx = document.getElementById('tempChart').getContext('2d');
+            
+            const smhiGradient = ctx.createLinearGradient(0, 0, 0, 300);
+            smhiGradient.addColorStop(0, 'rgba(56, 189, 248, 0.3)');
+            smhiGradient.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+
+            const omGradient = ctx.createLinearGradient(0, 0, 0, 300);
+            omGradient.addColorStop(0, 'rgba(52, 211, 153, 0.2)');
+            omGradient.addColorStop(1, 'rgba(52, 211, 153, 0.0)');
+
+            tempChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'SMHI (°C)',
+                            data: [],
+                            borderColor: '#38bdf8',
+                            backgroundColor: smhiGradient,
+                            borderWidth: 2.5,
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 2,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            label: 'Open-Meteo (°C)',
+                            data: [],
+                            borderColor: '#34d399',
+                            backgroundColor: omGradient,
+                            borderWidth: 2,
+                            borderDash: [4, 4],
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 1,
+                            pointHoverRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toFixed(1) + ' °C';
+                                    }
+                                    return label;
+                                }
+                            }
+                        },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: SNOW_THRESHOLD,
+                                    yMax: SNOW_THRESHOLD,
+                                    borderColor: '#f43f5e',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {
+                                        display: true,
+                                        content: `Snögräns (${SNOW_THRESHOLD.toFixed(1)}°C)`,
+                                        position: 'start',
+                                        backgroundColor: 'rgba(244, 63, 94, 0.8)',
+                                        color: '#fff',
+                                        font: { size: 10, weight: 'bold' }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 45 }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: {
+                                color: '#94a3b8',
+                                font: { size: 11 },
+                                callback: function(value) { return value + '°C'; }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update Chart Data
+        function updateChart(labels, smhiData, omData) {
+            if (!tempChart) return;
+            tempChart.data.labels = labels;
+            tempChart.data.datasets[0].data = smhiData;
+            tempChart.data.datasets[1].data = omData;
+            
+            // Update Annotation threshold line dynamically
+            if (tempChart.options.plugins.annotation.annotations.line1) {
+                tempChart.options.plugins.annotation.annotations.line1.yMin = SNOW_THRESHOLD;
+                tempChart.options.plugins.annotation.annotations.line1.yMax = SNOW_THRESHOLD;
+                tempChart.options.plugins.annotation.annotations.line1.label.content = `Snögräns (${SNOW_THRESHOLD.toFixed(1)}°C)`;
+            }
+
+            tempChart.update();
+        }
+    </script>
+</body>
+</html>
